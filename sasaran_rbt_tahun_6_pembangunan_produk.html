@@ -1,0 +1,1393 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sasaran RBT Tahun 6: Pembangunan Produk</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Tone.js for Web Audio Synthesis -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  
+  <!-- Google MediaPipe Hands & Camera Utils -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+  <!-- Google Font: Outfit & Fredoka -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Outfit:wght@400;600;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Fredoka', 'Outfit', sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      overflow: hidden;
+      background-color: #090d16;
+    }
+    .font-hud {
+      font-family: 'Outfit', sans-serif;
+    }
+    /* Neon glow utilities */
+    .glow-cyan {
+      box-shadow: 0 0 25px rgba(6, 182, 212, 0.6);
+    }
+    .glow-pink {
+      box-shadow: 0 0 25px rgba(236, 72, 153, 0.6);
+    }
+    .text-glow-yellow {
+      text-shadow: 0 0 12px rgba(250, 204, 21, 0.8);
+    }
+    .text-glow-cyan {
+      text-shadow: 0 0 14px rgba(34, 211, 238, 0.9);
+    }
+    /* Pulsing animations */
+    @keyframes pulse-ring {
+      0% { transform: scale(0.9); opacity: 0.8; }
+      50% { transform: scale(1.15); opacity: 0.3; }
+      100% { transform: scale(0.9); opacity: 0.8; }
+    }
+    .animate-pulse-ring {
+      animation: pulse-ring 1.8s infinite ease-in-out;
+    }
+    /* Custom scrollbar for analysis modal */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.8);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(56, 189, 248, 0.5);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(56, 189, 248, 0.8);
+    }
+  </style>
+</head>
+<body class="relative w-screen h-screen m-0 p-0 text-white bg-slate-950 flex flex-col items-center justify-center">
+
+  <!-- Hidden webcam video source for MediaPipe processing -->
+  <video id="webcam-video" class="hidden" playsinline></video>
+
+  <!-- Game and Tracking Viewport Container -->
+  <div id="game-container" class="relative w-full h-full overflow-hidden bg-slate-900 flex items-center justify-center">
+    
+    <!-- Video background rendering canvas (mirrored) -->
+    <canvas id="bg-canvas" class="absolute inset-0 w-full h-full object-cover"></canvas>
+    
+    <!-- Game objects, particles, HUD, and reticle overlay canvas -->
+    <canvas id="game-canvas" class="absolute inset-0 w-full h-full"></canvas>
+
+    <!-- Top Floating HUD Overlay -->
+    <div id="hud-panel" class="absolute top-0 left-0 right-0 p-4 md:p-6 flex flex-col md:flex-row items-center justify-between gap-3 pointer-events-none z-20 transition-all duration-300">
+      
+      <!-- Left: Player Score & Combo Streak -->
+      <div class="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
+        <div class="bg-slate-900/80 backdrop-blur-md border-2 border-cyan-400/50 rounded-2xl px-5 py-2.5 shadow-lg flex items-center gap-3">
+          <span class="text-2xl">🏆</span>
+          <div>
+            <div class="text-xs uppercase tracking-wider text-cyan-300 font-hud font-bold">Mata Skor</div>
+            <div id="hud-score" class="text-2xl md:text-3xl font-black text-glow-yellow text-yellow-300 tracking-wider">0</div>
+          </div>
+        </div>
+
+        <div id="combo-badge" class="bg-gradient-to-r from-pink-600 to-purple-600 border border-pink-400 rounded-2xl px-4 py-2 shadow-lg flex items-center gap-2 transform scale-0 transition-transform duration-200">
+          <span class="text-xl animate-bounce">🔥</span>
+          <span id="hud-combo" class="text-lg font-black text-white font-hud tracking-wider">KOMBO x2</span>
+        </div>
+      </div>
+
+      <!-- Center: Current Question Card -->
+      <div class="w-full max-w-2xl">
+        <div id="question-card" class="bg-slate-900/90 backdrop-blur-lg border-2 border-indigo-500/80 rounded-2xl p-4 md:p-5 shadow-2xl text-center relative overflow-hidden transition-all duration-300 transform scale-100">
+          <div class="flex items-center justify-between mb-1">
+            <span id="question-category" class="text-xs uppercase font-hud font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-500/30 text-indigo-300 border border-indigo-400/40">RBT TAHUN 6 • UNIT 3</span>
+            <span id="question-number" class="text-xs font-bold text-slate-300">Soalan 1 / 10</span>
+          </div>
+          <p id="question-text" class="text-base md:text-xl font-bold text-white tracking-wide leading-snug drop-shadow">
+            Memuatkan soalan...
+          </p>
+          <div class="absolute bottom-0 left-0 h-1.5 bg-gradient-to-r from-cyan-400 via-yellow-400 to-pink-500 w-full"></div>
+        </div>
+      </div>
+
+      <!-- Right: Timer, Gesture Status & Sound Toggle -->
+      <div class="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+        <!-- 60-Second Countdown Timer -->
+        <div class="bg-slate-900/80 backdrop-blur-md border-2 border-amber-400/60 rounded-2xl px-4 py-2.5 shadow-lg flex items-center gap-3">
+          <div class="relative w-8 h-8 flex items-center justify-center">
+            <svg class="w-full h-full transform -rotate-90">
+              <circle cx="16" cy="16" r="13" stroke="currentColor" stroke-width="3" class="text-slate-700" fill="transparent"/>
+              <circle id="timer-ring" cx="16" cy="16" r="13" stroke="currentColor" stroke-width="3" class="text-amber-400 transition-all duration-1000 ease-linear" fill="transparent" stroke-dasharray="81.68" stroke-dashoffset="0"/>
+            </svg>
+            <span class="absolute text-xs">⏱️</span>
+          </div>
+          <div>
+            <div class="text-[10px] uppercase font-hud text-amber-300 font-bold">Masa Tinggal</div>
+            <div id="hud-timer" class="text-2xl font-black text-amber-300 font-hud tracking-widest">60s</div>
+          </div>
+        </div>
+
+        <!-- Gesture Detection Tracker Indicator -->
+        <div id="gesture-indicator" class="bg-slate-900/80 backdrop-blur-md border-2 border-emerald-400/50 rounded-2xl px-3 py-2 flex items-center gap-2" title="Status Pengesanan Tangan">
+          <span id="gesture-icon" class="text-xl">🖐️</span>
+          <span id="gesture-text" class="text-xs font-bold text-emerald-300 hidden sm:inline">SEDIA</span>
+        </div>
+
+        <!-- Audio mute/unmute button -->
+        <button id="btn-toggle-sound" class="pointer-events-auto bg-slate-800/80 hover:bg-slate-700 border border-slate-600 rounded-2xl p-3 text-lg transition active:scale-95 shadow">
+          🔊
+        </button>
+      </div>
+    </div>
+
+    <!-- Start & Setup Screen Modal -->
+    <div id="start-screen" class="absolute inset-0 z-30 bg-slate-950/90 backdrop-blur-xl flex flex-col items-center justify-center p-6 text-center">
+      <div class="max-w-xl w-full bg-slate-900/90 border-2 border-cyan-400/50 rounded-3xl p-6 md:p-8 shadow-2xl relative glow-cyan">
+        
+        <!-- Badge -->
+        <div class="inline-flex items-center gap-2 bg-gradient-to-r from-cyan-500/20 to-indigo-500/20 border border-cyan-400/30 px-4 py-1.5 rounded-full text-cyan-300 text-xs font-bold uppercase tracking-wider mb-4">
+          <span>🚀</span> Reka Bentuk & Teknologi Tahun 6 (KSSR Semakan)
+        </div>
+
+        <h1 class="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-yellow-200 to-pink-400 font-hud mb-3 tracking-wide">
+          SASARAN RBT
+        </h1>
+        <p class="text-cyan-200/80 text-sm md:text-base font-medium mb-6">
+          Unit 3: Pembangunan Produk • Kuiz Sasaran Realiti Terimbuh Interaktif
+        </p>
+
+        <!-- Instructions Box -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6 text-left">
+          <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-3.5 flex flex-col items-center text-center">
+            <span class="text-3xl mb-1.5">👆</span>
+            <div class="font-bold text-cyan-300 text-sm mb-1">1. Halakan Jari</div>
+            <div class="text-xs text-slate-300 leading-relaxed">Gerakkan hujung jari telunjuk untuk mengarahkan sasaran retikel laser.</div>
+          </div>
+          <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-3.5 flex flex-col items-center text-center">
+            <span class="text-3xl mb-1.5">👌</span>
+            <div class="font-bold text-yellow-300 text-sm mb-1">2. Isyarat Cubit</div>
+            <div class="text-xs text-slate-300 leading-relaxed">Cubit ibu jari & telunjuk (Pinch) atau genggam tangan untuk memecahkan sasaran!</div>
+          </div>
+          <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-3.5 flex flex-col items-center text-center">
+            <span class="text-3xl mb-1.5">🎯</span>
+            <div class="font-bold text-pink-300 text-sm mb-1">3. Pecah Jawapan</div>
+            <div class="text-xs text-slate-300 leading-relaxed">Pilih jawapan yang tepat bagi soalan pembangunan produk sebelum masa tamat.</div>
+          </div>
+        </div>
+
+        <div class="bg-slate-800/50 border border-cyan-500/20 rounded-xl p-3 text-xs text-slate-400 mb-6 flex items-center justify-center gap-2">
+          <span>💡</span> <span>Tip: Anda juga boleh klik atau sentuh skrin secara manual sebagai sokongan sentuhan.</span>
+        </div>
+
+        <!-- Start Button -->
+        <button id="btn-start-game" class="w-full py-4 px-8 rounded-2xl bg-gradient-to-r from-cyan-500 via-indigo-500 to-pink-500 hover:from-cyan-400 hover:to-pink-400 text-white font-hud font-black text-xl tracking-wider shadow-lg transform active:scale-95 transition-all duration-200">
+          AKTIFKAN KAMERA & MULA
+        </button>
+
+        <div id="camera-loading" class="hidden mt-4 text-cyan-300 text-sm font-semibold flex items-center justify-center gap-2">
+          <svg class="animate-spin h-5 w-5 text-cyan-400" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+          </svg>
+          <span>Mengaktifkan MediaPipe & Penderia Tangan...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Game Over / Results Screen -->
+    <div id="result-screen" class="hidden absolute inset-0 z-30 bg-slate-950/95 backdrop-blur-xl flex flex-col items-center justify-center p-4 md:p-6 overflow-y-auto">
+      <div class="max-w-2xl w-full bg-slate-900 border-2 border-indigo-500/50 rounded-3xl p-6 md:p-8 shadow-2xl text-center my-auto">
+        
+        <div class="text-5xl md:text-6xl mb-2" id="result-trophy">🌟</div>
+        <h2 class="text-3xl md:text-4xl font-black text-white font-hud mb-1" id="result-headline">MISI SELESAI!</h2>
+        <p class="text-slate-400 text-sm mb-6" id="result-subtext">Prestasi Modul Unit 3: Pembangunan Produk</p>
+
+        <!-- Stars Display -->
+        <div class="flex justify-center gap-3 text-4xl mb-6" id="result-stars">
+          <span>⭐</span><span>⭐</span><span>⭐</span>
+        </div>
+
+        <!-- Scoreboard Stats Grid -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <div class="bg-slate-800/80 rounded-2xl p-3 border border-slate-700">
+            <div class="text-xs text-slate-400 font-bold uppercase">Skor Akhir</div>
+            <div id="res-score" class="text-2xl font-black text-yellow-300 font-hud">0</div>
+          </div>
+          <div class="bg-slate-800/80 rounded-2xl p-3 border border-slate-700">
+            <div class="text-xs text-slate-400 font-bold uppercase">Ketepatan</div>
+            <div id="res-accuracy" class="text-2xl font-black text-cyan-300 font-hud">0%</div>
+          </div>
+          <div class="bg-slate-800/80 rounded-2xl p-3 border border-slate-700">
+            <div class="text-xs text-slate-400 font-bold uppercase">Kombo Maks</div>
+            <div id="res-maxcombo" class="text-2xl font-black text-pink-400 font-hud">0x</div>
+          </div>
+          <div class="bg-slate-800/80 rounded-2xl p-3 border border-slate-700">
+            <div class="text-xs text-slate-400 font-bold uppercase">Jawapan Betul</div>
+            <div id="res-correct" class="text-2xl font-black text-emerald-400 font-hud">0/10</div>
+          </div>
+        </div>
+
+        <!-- Collapsible Question Analysis -->
+        <div class="text-left mb-6">
+          <button id="btn-toggle-review" class="w-full bg-slate-800 hover:bg-slate-700/80 border border-slate-600 rounded-xl px-4 py-3 text-sm font-bold flex items-center justify-between text-cyan-300 transition">
+            <span>📋 Analisis & Semakan Jawapan Topik Unit 3</span>
+            <span id="review-arrow">▼</span>
+          </button>
+          
+          <div id="review-container" class="hidden mt-3 max-h-56 overflow-y-auto space-y-2.5 p-2 bg-slate-950/60 rounded-xl border border-slate-800 text-xs">
+            <!-- Dynamically populated review items -->
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex flex-col sm:flex-row gap-3">
+          <button id="btn-replay" class="flex-1 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 font-hud font-extrabold text-lg transition active:scale-95 shadow-lg">
+            🔄 MAIN SEMULA
+          </button>
+          <button id="btn-copy-score" class="py-3.5 px-6 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-600 font-hud font-bold text-slate-200 transition active:scale-95 flex items-center justify-center gap-2">
+            📋 <span id="copy-btn-text">SALIN KEPUTUSAN</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Audio unlock banner / alert modal -->
+  <div id="toast-msg" class="fixed bottom-6 z-50 bg-slate-800/95 border border-cyan-400 text-cyan-200 text-sm px-5 py-2.5 rounded-full shadow-2xl opacity-0 transform translate-y-4 transition-all duration-300 pointer-events-none">
+    Pemberitahuan
+  </div>
+
+  <script>
+    /**
+     * Bank Soalan RBT Tahun 6 - Unit 3: Pembangunan Produk
+     * Dirangka teliti mengikut DSKP: Kajian keperluan pelanggan, penjanaan idea, lakaran,
+     * analisis lakaran, borang pengurusan projek, pengujian parameter, dan pendokumentasian.
+     */
+    const QUIZ_QUESTIONS = [
+      {
+        id: 1,
+        question: "Apakah langkah pertama dalam proses mereka bentuk produk berasaskan penyelesaian masalah?",
+        options: [
+          "Kajian Keperluan Pelanggan",
+          "Membuat Lakaran 3D",
+          "Pengujian di Makmal",
+          "Menjual di Pasaran"
+        ],
+        correct: 0,
+        explanation: "Kajian keperluan pelanggan bertujuan mengenal pasti masalah dan kehendak sebenar pengguna sebelum mereka bentuk."
+      },
+      {
+        id: 2,
+        question: "Borang apakah yang digunakan untuk mengumpulkan maklumat kehendak dan masalah pengguna?",
+        options: [
+          "Borang Pesanan Barang",
+          "Borang Kajian Keperluan Pelanggan",
+          "Borang Analisis Pasaran Saham",
+          "Borang Senarai Semak Pekerja"
+        ],
+        correct: 1,
+        explanation: "Borang Kajian Keperluan Pelanggan mengandungi maklumat asas pelanggan, fungsi produk sedia ada, dan penambahbaikan."
+      },
+      {
+        id: 3,
+        question: "Apakah tujuan utama membuat beberapa lakaran perkembangan idea bagi sesuatu produk?",
+        options: [
+          "Supaya lukisan nampak tebal",
+          "Memilih lakaran idea terbaik",
+          "Menghabiskan masa perancangan",
+          "Menguji ketahanan bateri"
+        ],
+        correct: 1,
+        explanation: "Beberapa lakaran perkembangan idea dihasilkan supaya kita dapat membuat penilaian dan memilih idea yang paling sesuai."
+      },
+      {
+        id: 4,
+        question: "Antara berikut, maklumat apakah yang WAJIB ada dalam analisis lakaran produk?",
+        options: [
+          "Nama saudara-mara pereka",
+          "Elemen dan prinsip reka bentuk",
+          "Harga petrol semasa",
+          "Bilangan pekerja kilang"
+        ],
+        correct: 1,
+        explanation: "Analisis lakaran menilai elemen (garisan, bentuk, rupa, ruang) dan prinsip reka bentuk (keseimbangan, kontras, kesatuan)."
+      },
+      {
+        id: 5,
+        question: "Gabungan teknologi seperti elektrik, mekanikal dan elektronik dalam produk dikenali sebagai...",
+        options: [
+          "Gabungan Teknologi Produk",
+          "Reka Bentuk Hiasan Semata",
+          "Pemasangan Rawak",
+          "Teknologi Tradisional"
+        ],
+        correct: 0,
+        explanation: "Pembangunan produk inovatif Tahun 6 menggabungkan sekurang-kurangnya dua aplikasi teknologi yang berbeza."
+      },
+      {
+        id: 6,
+        question: "Mengapakah jadual kerja (carta Gantt atau garis masa) penting dalam pembangunan produk?",
+        options: [
+          "Mengira markah murid lain",
+          "Memastikan projek siap mengikut masa",
+          "Memilih warna cat produk",
+          "Menggantikan guru di kelas"
+        ],
+        correct: 1,
+        explanation: "Jadual kerja menguruskan tempoh masa aktiviti projek dari mula sehingga selesai mengikut perancangan."
+      },
+      {
+        id: 7,
+        question: "Dalam pengurusan kewangan produk, kos pengeluaran terdiri daripada Kos Bahan, Kos Upah dan...",
+        options: [
+          "Kos Minyak Wangi",
+          "Kos Overhed",
+          "Kos Percutian",
+          "Kos Pengiklanan TV"
+        ],
+        correct: 1,
+        explanation: "Formula Kos Pengeluaran = Kos Bahan + Kos Upah + Kos Overhed (seperti elektrik/air)."
+      },
+      {
+        id: 8,
+        question: "Apakah jenis ujian yang dilakukan untuk menguji kefungsian dan kekuatan produk dalam keadaan sebenar?",
+        options: [
+          "Ujian Parameter / Makmal",
+          "Ujian Selera Makanan",
+          "Ujian Membaca Pantas",
+          "Ujian Penglihatan Mata"
+        ],
+        correct: 0,
+        explanation: "Ujian parameter atau ujian makmal menguji daya ketahanan, kestabilan, dan kefungsian sebenar produk."
+      },
+      {
+        id: 9,
+        question: "Apakah tindakan seterusnya sekiranya produk yang diuji didapati mempunyai kelemahan ketara?",
+        options: [
+          "Buang ke dalam tong sampah",
+          "Membuat cadangan penambahbaikan",
+          "Terus jual kepada orang ramai",
+          "Tukar nama produk sahaja"
+        ],
+        correct: 1,
+        explanation: "Berdasarkan laporan pengujian, cadangan penambahbaikan dibuat bagi membaiki kelemahan reka bentuk atau fungsi."
+      },
+      {
+        id: 10,
+        question: "Apakah tujuan pendokumentasian dan laporan projek disediakan pada akhir pembangunan produk?",
+        options: [
+          "Bukti rekod reka bentuk dan rujukan",
+          "Dijadikan bahan bakar memasak",
+          "Mengelakkan murid bermain",
+          "Menutup kesilapan penghasilan"
+        ],
+        correct: 0,
+        explanation: "Dokumentasi menghimpunkan semua rekod kajian, lakaran, perancangan, kewangan, dan pengujian untuk rujukan masa depan."
+      }
+    ];
+
+    // Audio engine using Tone.js synthesizers
+    const AudioEngine = {
+      isMuted: false,
+      isInitialized: false,
+      synth: null,
+      noiseSynth: null,
+      polySynth: null,
+
+      init() {
+        if (this.isInitialized) return;
+        try {
+          // Tone poly synth for pleasant chords and chimes
+          this.polySynth = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: "triangle8" },
+            envelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.4 }
+          }).toDestination();
+          this.polySynth.volume.value = -6;
+
+          // Simple synth for laser pointer/pop
+          this.synth = new Tone.MembraneSynth().toDestination();
+          this.synth.volume.value = -4;
+
+          // Noise synth for popping/burst effect
+          this.noiseSynth = new Tone.NoiseSynth({
+            noise: { type: "pink" },
+            envelope: { attack: 0.005, decay: 0.12, sustain: 0 }
+          }).toDestination();
+          this.noiseSynth.volume.value = -8;
+
+          this.isInitialized = true;
+        } catch (e) {
+          console.warn("Audio init warning:", e);
+        }
+      },
+
+      playPop() {
+        if (this.isMuted || !this.isInitialized) return;
+        try {
+          this.synth.triggerAttackRelease("C3", "32n");
+          this.noiseSynth.triggerAttackRelease("16n");
+        } catch(e){}
+      },
+
+      playCorrect(combo = 1) {
+        if (this.isMuted || !this.isInitialized) return;
+        try {
+          const notes = combo > 2 ? ["C5", "E5", "G5", "C6"] : ["E5", "B5"];
+          this.polySynth.triggerAttackRelease(notes, "8n");
+        } catch(e){}
+      },
+
+      playWrong() {
+        if (this.isMuted || !this.isInitialized) return;
+        try {
+          this.polySynth.triggerAttackRelease(["F3", "Db3"], "16n");
+        } catch(e){}
+      },
+
+      playGameOver() {
+        if (this.isMuted || !this.isInitialized) return;
+        try {
+          this.polySynth.triggerAttackRelease(["G4", "C5", "E5", "G5"], "4n");
+        } catch(e){}
+      },
+
+      toggleMute() {
+        this.isMuted = !this.isMuted;
+        return this.isMuted;
+      }
+    };
+
+    // Game State Object
+    const state = {
+      score: 0,
+      combo: 0,
+      maxCombo: 0,
+      correctCount: 0,
+      currentQuestionIdx: 0,
+      timeRemaining: 60,
+      timerInterval: null,
+      isPlaying: false,
+      userAnswers: [], // stores review: { question, chosen, correct, isCorrect, explanation }
+      
+      // Target balloons
+      targets: [],
+      particles: [],
+      floatingTexts: [],
+
+      // Hand gesture tracking
+      handDetected: false,
+      reticle: {
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2,
+        targetX: window.innerWidth / 2,
+        targetY: window.innerHeight / 2,
+        isPinching: false,
+        wasPinching: false,
+        isFist: false,
+        pinchDistance: 1,
+        landmarks: []
+      },
+      lastTriggerTime: 0,
+      triggerCooldown: 320 // ms debounce
+    };
+
+    // Color Palette for Balloons
+    const BALLOON_COLORS = [
+      { bg: 'rgba(6, 182, 212, 0.85)', border: '#22d3ee', glow: 'rgba(34, 211, 238, 0.5)', letter: 'A' },
+      { bg: 'rgba(236, 72, 153, 0.85)', border: '#f472b6', glow: 'rgba(244, 114, 182, 0.5)', letter: 'B' },
+      { bg: 'rgba(168, 85, 247, 0.85)', border: '#c084fc', glow: 'rgba(192, 132, 252, 0.5)', letter: 'C' },
+      { bg: 'rgba(234, 179, 8, 0.85)', border: '#facc15', glow: 'rgba(250, 204, 21, 0.5)', letter: 'D' }
+    ];
+
+    class Particle {
+      constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 7 + 2;
+        this.vx = Math.cos(angle) * speed;
+        this.vy = Math.sin(angle) * speed;
+        this.size = Math.random() * 7 + 3;
+        this.color = color;
+        this.alpha = 1;
+        this.decay = Math.random() * 0.03 + 0.02;
+        this.gravity = 0.15;
+      }
+
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.vy += this.gravity;
+        this.alpha -= this.decay;
+      }
+
+      draw(ctx) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.alpha);
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    class FloatingText {
+      constructor(text, x, y, color, isBig = false) {
+        this.text = text;
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.alpha = 1;
+        this.vy = -2.2;
+        this.size = isBig ? 32 : 22;
+      }
+
+      update() {
+        this.y += this.vy;
+        this.alpha -= 0.025;
+      }
+
+      draw(ctx) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, this.alpha);
+        ctx.font = `900 ${this.size}px 'Fredoka', 'Outfit', sans-serif`;
+        ctx.fillStyle = this.color;
+        ctx.shadowColor = this.color;
+        ctx.shadowBlur = 12;
+        ctx.textAlign = 'center';
+        ctx.fillText(this.text, this.x, this.y);
+        ctx.restore();
+      }
+    }
+
+    class BalloonTarget {
+      constructor(index, text, isCorrect, totalCount, canvasWidth, canvasHeight) {
+        this.index = index;
+        this.text = text;
+        this.isCorrect = isCorrect;
+        this.theme = BALLOON_COLORS[index % BALLOON_COLORS.length];
+
+        // Distributed column placement
+        const segmentWidth = canvasWidth / totalCount;
+        this.baseX = segmentWidth * index + segmentWidth / 2;
+        this.x = this.baseX;
+        
+        // Spawn slightly staggered from the bottom
+        this.y = canvasHeight + 80 + (index * 45);
+        this.targetY = canvasHeight * 0.42 + (Math.sin(index * 1.5) * 60);
+
+        this.radius = Math.min(Math.max(canvasWidth * 0.08, 55), 78);
+        this.wobbleSpeed = 0.03 + Math.random() * 0.02;
+        this.wobblePhase = Math.random() * Math.PI * 2;
+        this.wobbleAmp = 25 + Math.random() * 20;
+
+        this.isPopped = false;
+        this.scale = 1;
+        this.isHovered = false;
+        this.speedY = 4.2;
+      }
+
+      update(time) {
+        // Smooth entrance float up
+        if (this.y > this.targetY) {
+          this.y -= this.speedY;
+        } else {
+          // Gentle floating hovering oscillation
+          this.y = this.targetY + Math.sin(time * 0.002 + this.wobblePhase) * 16;
+        }
+        this.x = this.baseX + Math.sin(time * this.wobbleSpeed + this.wobblePhase) * this.wobbleAmp;
+      }
+
+      draw(ctx) {
+        if (this.isPopped) return;
+
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.scale(this.scale, this.scale);
+
+        // Hover pulsing glow
+        if (this.isHovered) {
+          ctx.shadowColor = '#38bdf8';
+          ctx.shadowBlur = 30;
+        } else {
+          ctx.shadowColor = this.theme.glow;
+          ctx.shadowBlur = 15;
+        }
+
+        // 1. Balloon String Line
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.lineWidth = 2;
+        ctx.moveTo(0, this.radius);
+        ctx.bezierCurveTo(10, this.radius + 20, -10, this.radius + 40, 0, this.radius + 60);
+        ctx.stroke();
+
+        // 2. Main Balloon Body
+        ctx.beginPath();
+        ctx.ellipse(0, 0, this.radius * 0.9, this.radius * 1.05, 0, 0, Math.PI * 2);
+        ctx.fillStyle = this.isHovered ? '#1e293b' : this.theme.bg;
+        ctx.fill();
+
+        ctx.lineWidth = this.isHovered ? 4 : 3;
+        ctx.strokeStyle = this.isHovered ? '#38bdf8' : this.theme.border;
+        ctx.stroke();
+
+        // 3. Specular Highlight for 3D Balloon shine
+        ctx.beginPath();
+        ctx.ellipse(-this.radius * 0.35, -this.radius * 0.4, this.radius * 0.22, this.radius * 0.12, -Math.PI / 4, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+        ctx.fill();
+
+        // 4. Letter Tag Badge (A, B, C, D)
+        ctx.beginPath();
+        ctx.arc(0, -this.radius * 0.65, 16, 0, Math.PI * 2);
+        ctx.fillStyle = '#0f172a';
+        ctx.fill();
+        ctx.strokeStyle = this.theme.border;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = "bold 15px 'Outfit', sans-serif";
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.theme.letter, 0, -this.radius * 0.65);
+
+        // 5. Answer Text Wrapped Inside Balloon
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = '#ffffff';
+        ctx.font = "600 13px 'Fredoka', 'Outfit', sans-serif";
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // Multi-line word wrap
+        this.renderWrappedText(ctx, this.text, 0, 8, this.radius * 1.5, 16);
+
+        ctx.restore();
+      }
+
+      renderWrappedText(ctx, text, x, y, maxWidth, lineHeight) {
+        const words = text.split(' ');
+        let line = '';
+        const lines = [];
+
+        for (let i = 0; i < words.length; i++) {
+          const testLine = line + words[i] + ' ';
+          const metrics = ctx.measureText(testLine);
+          if (metrics.width > maxWidth && i > 0) {
+            lines.push(line);
+            line = words[i] + ' ';
+          } else {
+            line = testLine;
+          }
+        }
+        lines.push(line);
+
+        // Center lines vertically
+        const startY = y - ((lines.length - 1) * lineHeight) / 2;
+        for (let j = 0; j < lines.length; j++) {
+          ctx.fillText(lines[j].trim(), x, startY + (j * lineHeight));
+        }
+      }
+
+      checkHit(px, py) {
+        const dx = px - this.x;
+        const dy = py - this.y;
+        return (dx * dx) / ((this.radius * 0.9) ** 2) + (dy * dy) / ((this.radius * 1.05) ** 2) <= 1.15;
+      }
+    }
+
+    const bgCanvas = document.getElementById('bg-canvas');
+    const bgCtx = bgCanvas.getContext('2d');
+    const gameCanvas = document.getElementById('game-canvas');
+    const gameCtx = gameCanvas.getContext('2d');
+    const videoElement = document.getElementById('webcam-video');
+
+    function resizeCanvases() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      bgCanvas.width = w;
+      bgCanvas.height = h;
+      gameCanvas.width = w;
+      gameCanvas.height = h;
+    }
+    window.addEventListener('resize', resizeCanvases);
+    resizeCanvases();
+
+    // MediaPipe Hands Instance
+    let handsDetector = null;
+    let cameraInstance = null;
+
+    function setupMediaPipe() {
+      handsDetector = new Hands({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+      });
+
+      handsDetector.setOptions({
+        maxNumHands: 1,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.65,
+        minTrackingConfidence: 0.65
+      });
+
+      handsDetector.onResults(onHandResults);
+    }
+
+    function onHandResults(results) {
+      // 1. Draw mirrored background video frame
+      bgCtx.save();
+      bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+      
+      if (results.image) {
+        bgCtx.translate(bgCanvas.width, 0);
+        bgCtx.scale(-1, 1);
+        bgCtx.drawImage(results.image, 0, 0, bgCanvas.width, bgCanvas.height);
+        
+        // Dark translucent cyber-overlay for contrast
+        bgCtx.fillStyle = 'rgba(10, 15, 30, 0.72)';
+        bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+      }
+      bgCtx.restore();
+
+      // 2. Gesture landmark evaluation
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        const landmarks = results.multiHandLandmarks[0];
+        state.handDetected = true;
+        state.reticle.landmarks = landmarks;
+
+        // Landmark 8: Index Finger Tip (Mirrored X coordinate)
+        const indexTip = landmarks[8];
+        const thumbTip = landmarks[4];
+        const wrist = landmarks[0];
+
+        // Smooth target position interpolation
+        const screenX = (1 - indexTip.x) * gameCanvas.width;
+        const screenY = indexTip.y * gameCanvas.height;
+
+        state.reticle.targetX = screenX;
+        state.reticle.targetY = screenY;
+
+        // Calculate Euclidean distance between Thumb Tip (4) and Index Tip (8)
+        const dx = (thumbTip.x - indexTip.x);
+        const dy = (thumbTip.y - indexTip.y);
+        const dz = (thumbTip.z - indexTip.z);
+        const pinchDistance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        state.reticle.pinchDistance = pinchDistance;
+
+        // Check if hand is in Fist (Genggam) mode
+        // In a fist, tips of fingers (8, 12, 16, 20) are close to wrist (0)
+        const d8 = Math.hypot(landmarks[8].x - wrist.x, landmarks[8].y - wrist.y);
+        const d12 = Math.hypot(landmarks[12].x - wrist.x, landmarks[12].y - wrist.y);
+        const d16 = Math.hypot(landmarks[16].x - wrist.x, landmarks[16].y - wrist.y);
+        const d20 = Math.hypot(landmarks[20].x - wrist.x, landmarks[20].y - wrist.y);
+        const avgTipDist = (d8 + d12 + d16 + d20) / 4;
+        const isFist = avgTipDist < 0.28;
+
+        // Pinch trigger threshold: normalized distance < 0.065
+        const isPinch = pinchDistance < 0.065;
+
+        state.reticle.isPinching = isPinch;
+        state.reticle.isFist = isFist;
+
+        // Update HUD gesture indicator
+        updateGestureHUD(isPinch, isFist);
+
+        // Action Trigger Check
+        if ((isPinch || isFist) && state.isPlaying) {
+          triggerShot(state.reticle.x, state.reticle.y);
+        }
+      } else {
+        state.handDetected = false;
+        state.reticle.landmarks = [];
+        updateGestureHUD(false, false);
+      }
+    }
+
+    function updateGestureHUD(isPinch, isFist) {
+      const icon = document.getElementById('gesture-icon');
+      const text = document.getElementById('gesture-text');
+      
+      if (!state.handDetected) {
+        icon.textContent = '❌';
+        text.textContent = 'TIADA TANGAN';
+        text.className = 'text-xs font-bold text-rose-400 hidden sm:inline';
+        return;
+      }
+
+      if (isPinch) {
+        icon.textContent = '👌';
+        text.textContent = 'CUBIT / PINCH!';
+        text.className = 'text-xs font-bold text-yellow-300 hidden sm:inline';
+      } else if (isFist) {
+        icon.textContent = '✊';
+        text.textContent = 'GENGGAM!';
+        text.className = 'text-xs font-bold text-pink-400 hidden sm:inline';
+      } else {
+        icon.textContent = '👆';
+        text.textContent = 'MENUNJUK';
+        text.className = 'text-xs font-bold text-cyan-300 hidden sm:inline';
+      }
+    }
+
+    function triggerShot(x, y) {
+      const now = performance.now();
+      if (now - state.lastTriggerTime < state.triggerCooldown) return;
+      state.lastTriggerTime = now;
+
+      // Reticle shot blast feedback
+      AudioEngine.playPop();
+
+      // Check collision with balloons
+      let hitTarget = null;
+      for (const target of state.targets) {
+        if (!target.isPopped && target.checkHit(x, y)) {
+          hitTarget = target;
+          break;
+        }
+      }
+
+      if (hitTarget) {
+        processBalloonPop(hitTarget);
+      } else {
+        // Miss blast effect
+        createSparks(x, y, '#94a3b8', 10);
+      }
+    }
+
+    function processBalloonPop(target) {
+      target.isPopped = true;
+
+      // Record answer review
+      const currentQ = QUIZ_QUESTIONS[state.currentQuestionIdx];
+      const isCorrect = target.isCorrect;
+
+      state.userAnswers.push({
+        question: currentQ.question,
+        chosen: target.text,
+        correct: currentQ.options[currentQ.correct],
+        isCorrect: isCorrect,
+        explanation: currentQ.explanation
+      });
+
+      if (isCorrect) {
+        state.combo++;
+        if (state.combo > state.maxCombo) state.maxCombo = state.combo;
+        state.correctCount++;
+
+        // Calculate dynamic score with combo bonus
+        const baseScore = 100;
+        const comboBonus = (state.combo - 1) * 35;
+        const earned = baseScore + comboBonus;
+        state.score += earned;
+
+        AudioEngine.playCorrect(state.combo);
+
+        // Visual effects
+        createBurst(target.x, target.y, '#34d399', 40);
+        state.floatingTexts.push(new FloatingText(`+${earned}!`, target.x, target.y - 20, '#facc15', true));
+        if (state.combo >= 2) {
+          state.floatingTexts.push(new FloatingText(`KOMBO x${state.combo} 🔥`, target.x, target.y - 60, '#f472b6', false));
+        }
+
+        // Show toast
+        showToast("✨ TEPAT SEKALI! " + (state.combo > 1 ? `Kombo x${state.combo}!` : ""));
+      } else {
+        state.combo = 0;
+        AudioEngine.playWrong();
+
+        // Wrong burst effect
+        createBurst(target.x, target.y, '#f43f5e', 35);
+        state.floatingTexts.push(new FloatingText('SALAH!', target.x, target.y - 20, '#fb7185', true));
+        showToast("⚠️ Kurang tepat! Semak semula kajian keperluan produk.");
+      }
+
+      updateHUD();
+
+      // Proceed to next question with a smooth transition
+      setTimeout(() => {
+        nextQuestion();
+      }, 750);
+    }
+
+    function loadQuestion(index) {
+      if (index >= QUIZ_QUESTIONS.length) {
+        endGame();
+        return;
+      }
+
+      state.currentQuestionIdx = index;
+      const q = QUIZ_QUESTIONS[index];
+
+      // Update question DOM
+      document.getElementById('question-number').textContent = `Soalan ${index + 1} / ${QUIZ_QUESTIONS.length}`;
+      document.getElementById('question-text').textContent = q.question;
+
+      // Animate card entry
+      const card = document.getElementById('question-card');
+      card.classList.remove('scale-100');
+      card.classList.add('scale-95');
+      setTimeout(() => {
+        card.classList.remove('scale-95');
+        card.classList.add('scale-100');
+      }, 150);
+
+      // Create balloon targets
+      state.targets = [];
+      const opts = q.options;
+      const total = opts.length;
+
+      for (let i = 0; i < total; i++) {
+        const isCorrect = (i === q.correct);
+        const balloon = new BalloonTarget(i, opts[i], isCorrect, total, gameCanvas.width, gameCanvas.height);
+        state.targets.push(balloon);
+      }
+    }
+
+    function nextQuestion() {
+      if (!state.isPlaying) return;
+      loadQuestion(state.currentQuestionIdx + 1);
+    }
+
+    function createBurst(x, y, color, count = 30) {
+      for (let i = 0; i < count; i++) {
+        state.particles.push(new Particle(x, y, color));
+      }
+      // Add extra gold sparkles
+      for (let j = 0; j < 10; j++) {
+        state.particles.push(new Particle(x, y, '#fef08a'));
+      }
+    }
+
+    function createSparks(x, y, color, count = 10) {
+      for (let i = 0; i < count; i++) {
+        state.particles.push(new Particle(x, y, color));
+      }
+    }
+
+    function drawReticle(ctx) {
+      const r = state.reticle;
+      
+      // Smooth lerp movement toward target position
+      r.x += (r.targetX - r.x) * 0.35;
+      r.y += (r.targetY - r.y) * 0.35;
+
+      ctx.save();
+      ctx.translate(r.x, r.y);
+
+      const isPinching = r.isPinching || r.isFist;
+      const reticleColor = isPinching ? '#f43f5e' : '#38bdf8';
+
+      // 1. Draw Outer Tech Ring
+      ctx.beginPath();
+      ctx.arc(0, 0, isPinching ? 22 : 32, 0, Math.PI * 2);
+      ctx.strokeStyle = reticleColor;
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([8, 6]);
+      ctx.stroke();
+
+      // 2. Draw Crosshairs
+      ctx.setLineDash([]);
+      ctx.strokeStyle = reticleColor;
+      ctx.lineWidth = 2;
+      const crossSize = isPinching ? 14 : 20;
+
+      ctx.beginPath();
+      // Top
+      ctx.moveTo(0, -crossSize - 6);
+      ctx.lineTo(0, -6);
+      // Bottom
+      ctx.moveTo(0, crossSize + 6);
+      ctx.lineTo(0, 6);
+      // Left
+      ctx.moveTo(-crossSize - 6, 0);
+      ctx.lineTo(-6, 0);
+      // Right
+      ctx.moveTo(crossSize + 6, 0);
+      ctx.lineTo(6, 0);
+      ctx.stroke();
+
+      // 3. Center Target Dot
+      ctx.beginPath();
+      ctx.arc(0, 0, isPinching ? 6 : 4, 0, Math.PI * 2);
+      ctx.fillStyle = isPinching ? '#facc15' : '#ffffff';
+      ctx.shadowColor = reticleColor;
+      ctx.shadowBlur = 12;
+      ctx.fill();
+
+      // 4. Energy Charge Wave when pinching
+      if (isPinching) {
+        ctx.beginPath();
+        ctx.arc(0, 0, 46, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(244, 63, 94, 0.4)';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+      }
+
+      ctx.restore();
+
+      // Optional: Draw skeleton connection lines between finger landmarks
+      if (r.landmarks && r.landmarks.length > 0) {
+        drawHandLandmarks(ctx, r.landmarks);
+      }
+    }
+
+    function drawHandLandmarks(ctx, lm) {
+      ctx.save();
+      // Landmark 4 (Thumb) and 8 (Index) connection beam
+      const w = gameCanvas.width;
+      const h = gameCanvas.height;
+
+      const p4 = { x: (1 - lm[4].x) * w, y: lm[4].y * h };
+      const p8 = { x: (1 - lm[8].x) * w, y: lm[8].y * h };
+
+      ctx.beginPath();
+      ctx.moveTo(p4.x, p4.y);
+      ctx.lineTo(p8.x, p8.y);
+      ctx.strokeStyle = state.reticle.isPinching ? 'rgba(250, 204, 21, 0.8)' : 'rgba(56, 189, 248, 0.4)';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      // Dots on Thumb Tip and Index Tip
+      [p4, p8].forEach(pt => {
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#38bdf8';
+        ctx.fill();
+      });
+
+      ctx.restore();
+    }
+
+    let lastFrameTime = performance.now();
+
+    function gameLoop(currentTime) {
+      gameCtx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
+
+      if (state.isPlaying) {
+        // 1. Update and draw floating balloon targets
+        for (let i = 0; i < state.targets.length; i++) {
+          const target = state.targets[i];
+          target.update(currentTime);
+          
+          // Check hover state with reticle
+          target.isHovered = target.checkHit(state.reticle.x, state.reticle.y);
+          target.draw(gameCtx);
+        }
+
+        // 2. Update and draw particles
+        for (let i = state.particles.length - 1; i >= 0; i--) {
+          const p = state.particles[i];
+          p.update();
+          p.draw(gameCtx);
+          if (p.alpha <= 0) {
+            state.particles.splice(i, 1);
+          }
+        }
+
+        // 3. Update and draw floating texts
+        for (let i = state.floatingTexts.length - 1; i >= 0; i--) {
+          const ft = state.floatingTexts[i];
+          ft.update();
+          ft.draw(gameCtx);
+          if (ft.alpha <= 0) {
+            state.floatingTexts.splice(i, 1);
+          }
+        }
+      }
+
+      // 4. Always render player's hand reticle
+      drawReticle(gameCtx);
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    function updateHUD() {
+      document.getElementById('hud-score').textContent = state.score;
+
+      // Combo badge animation
+      const comboBadge = document.getElementById('combo-badge');
+      const comboText = document.getElementById('hud-combo');
+      if (state.combo >= 2) {
+        comboText.textContent = `KOMBO x${state.combo}`;
+        comboBadge.classList.remove('scale-0');
+        comboBadge.classList.add('scale-100');
+      } else {
+        comboBadge.classList.remove('scale-100');
+        comboBadge.classList.add('scale-0');
+      }
+    }
+
+    function startTimer() {
+      state.timeRemaining = 60;
+      updateTimerDisplay();
+
+      if (state.timerInterval) clearInterval(state.timerInterval);
+
+      state.timerInterval = setInterval(() => {
+        state.timeRemaining--;
+        updateTimerDisplay();
+
+        if (state.timeRemaining <= 0) {
+          clearInterval(state.timerInterval);
+          endGame();
+        }
+      }, 1000);
+    }
+
+    function updateTimerDisplay() {
+      const timerEl = document.getElementById('hud-timer');
+      const ringEl = document.getElementById('timer-ring');
+      
+      timerEl.textContent = `${state.timeRemaining}s`;
+
+      // Circular dashoffset calculation (Circumference ~ 81.68)
+      const fraction = state.timeRemaining / 60;
+      const offset = 81.68 * (1 - fraction);
+      ringEl.style.strokeDashoffset = offset;
+
+      if (state.timeRemaining <= 10) {
+        timerEl.classList.add('text-rose-400', 'animate-pulse');
+        ringEl.classList.remove('text-amber-400');
+        ringEl.classList.add('text-rose-500');
+      } else {
+        timerEl.classList.remove('text-rose-400', 'animate-pulse');
+        ringEl.classList.remove('text-rose-500');
+        ringEl.classList.add('text-amber-400');
+      }
+    }
+
+    function startGame() {
+      AudioEngine.init();
+      state.score = 0;
+      state.combo = 0;
+      state.maxCombo = 0;
+      state.correctCount = 0;
+      state.userAnswers = [];
+      state.isPlaying = true;
+
+      document.getElementById('start-screen').classList.add('hidden');
+      document.getElementById('result-screen').classList.add('hidden');
+
+      updateHUD();
+      loadQuestion(0);
+      startTimer();
+    }
+
+    function endGame() {
+      state.isPlaying = false;
+      if (state.timerInterval) clearInterval(state.timerInterval);
+
+      AudioEngine.playGameOver();
+
+      // Show results modal
+      const resultModal = document.getElementById('result-screen');
+      resultModal.classList.remove('hidden');
+
+      // Populate statistics
+      const totalAnswered = state.userAnswers.length;
+      const accuracy = totalAnswered > 0 ? Math.round((state.correctCount / totalAnswered) * 100) : 0;
+
+      document.getElementById('res-score').textContent = state.score;
+      document.getElementById('res-accuracy').textContent = `${accuracy}%`;
+      document.getElementById('res-maxcombo').textContent = `${state.maxCombo}x`;
+      document.getElementById('res-correct').textContent = `${state.correctCount}/${QUIZ_QUESTIONS.length}`;
+
+      // Star rating calculation
+      const starContainer = document.getElementById('result-stars');
+      const headline = document.getElementById('result-headline');
+      const trophy = document.getElementById('result-trophy');
+
+      if (accuracy >= 80) {
+        starContainer.innerHTML = '<span>⭐</span><span>⭐</span><span>⭐</span>';
+        headline.textContent = 'CEMERLANG! PEREKA MUDA TERBAIK!';
+        trophy.textContent = '🏆';
+      } else if (accuracy >= 50) {
+        starContainer.innerHTML = '<span>⭐</span><span>⭐</span><span class="opacity-30">⭐</span>';
+        headline.textContent = 'USAHA YANG BAGUS!';
+        trophy.textContent = '🥈';
+      } else {
+        starContainer.innerHTML = '<span>⭐</span><span class="opacity-30">⭐</span><span class="opacity-30">⭐</span>';
+        headline.textContent = 'TERUSKAN MENGULANGKAJI!';
+        trophy.textContent = '🛠️';
+      }
+
+      // Populate answer review list
+      populateAnswerReview();
+    }
+
+    function populateAnswerReview() {
+      const reviewContainer = document.getElementById('review-container');
+      reviewContainer.innerHTML = '';
+
+      if (state.userAnswers.length === 0) {
+        reviewContainer.innerHTML = `<div class="p-3 text-center text-slate-400">Tiada soalan sempat dijawab.</div>`;
+        return;
+      }
+
+      state.userAnswers.forEach((ans, i) => {
+        const item = document.createElement('div');
+        item.className = `p-3 rounded-xl border ${ans.isCorrect ? 'bg-emerald-950/40 border-emerald-500/40' : 'bg-rose-950/40 border-rose-500/40'} flex flex-col gap-1.5`;
+
+        item.innerHTML = `
+          <div class="flex items-start justify-between gap-2">
+            <span class="font-bold text-white leading-tight">#${i + 1}. ${ans.question}</span>
+            <span class="text-base shrink-0">${ans.isCorrect ? '✅' : '❌'}</span>
+          </div>
+          <div class="flex flex-wrap gap-x-4 gap-y-1 text-slate-300">
+            <div><span class="text-slate-400">Pilihan Anda:</span> <span class="${ans.isCorrect ? 'text-emerald-300 font-bold' : 'text-rose-300 line-through'}">${ans.chosen}</span></div>
+            ${!ans.isCorrect ? `<div><span class="text-slate-400">Jawapan Betul:</span> <span class="text-emerald-300 font-bold">${ans.correct}</span></div>` : ''}
+          </div>
+          <div class="text-[11px] text-cyan-200/80 bg-slate-900/60 p-2 rounded-lg mt-0.5">
+            💡 <strong class="text-cyan-300">Nota:</strong> ${ans.explanation}
+          </div>
+        `;
+        reviewContainer.appendChild(item);
+      });
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast-msg');
+      toast.textContent = msg;
+      toast.classList.remove('opacity-0', 'translate-y-4');
+      toast.classList.add('opacity-100', 'translate-y-0');
+
+      setTimeout(() => {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', 'translate-y-4');
+      }, 2500);
+    }
+
+    // Toggle Review Dropdown in results modal
+    const btnToggleReview = document.getElementById('btn-toggle-review');
+    const reviewContainer = document.getElementById('review-container');
+    const reviewArrow = document.getElementById('review-arrow');
+
+    btnToggleReview.addEventListener('click', () => {
+      const isHidden = reviewContainer.classList.contains('hidden');
+      if (isHidden) {
+        reviewContainer.classList.remove('hidden');
+        reviewArrow.textContent = '▲';
+      } else {
+        reviewContainer.classList.add('hidden');
+        reviewArrow.textContent = '▼';
+      }
+    });
+
+    // Toggle Sound Button
+    const btnSound = document.getElementById('btn-toggle-sound');
+    btnSound.addEventListener('click', () => {
+      AudioEngine.init();
+      const isMuted = AudioEngine.toggleMute();
+      btnSound.textContent = isMuted ? '🔇' : '🔊';
+      showToast(isMuted ? 'Audio Dimatikan' : 'Audio Dihidupkan');
+    });
+
+    // Replay Button
+    document.getElementById('btn-replay').addEventListener('click', () => {
+      startGame();
+    });
+
+    // Copy Results Button
+    document.getElementById('btn-copy-score').addEventListener('click', () => {
+      const accuracy = state.userAnswers.length > 0 ? Math.round((state.correctCount / state.userAnswers.length) * 100) : 0;
+      const textToCopy = `🎯 Keputusan Sasaran RBT Tahun 6 (Unit 3: Pembangunan Produk)\n🏆 Skor: ${state.score}\n⭐ Ketepatan: ${accuracy}%\n🔥 Kombo Maks: ${state.maxCombo}x\n✅ Betul: ${state.correctCount}/${QUIZ_QUESTIONS.length}`;
+
+      try {
+        const tempInput = document.createElement("textarea");
+        tempInput.value = textToCopy;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand("copy");
+        document.body.removeChild(tempInput);
+
+        const btnText = document.getElementById('copy-btn-text');
+        btnText.textContent = "DISALIN!";
+        setTimeout(() => { btnText.textContent = "SALIN KEPUTUSAN"; }, 2000);
+        showToast("📋 Skor berjaya disalin ke papan keratan!");
+      } catch (e) {
+        showToast("Gagal menyalin skor.");
+      }
+    });
+
+    // Mouse & Touch fallback controls (allow playing without camera)
+    window.addEventListener('mousemove', (e) => {
+      if (!state.handDetected) {
+        state.reticle.targetX = e.clientX;
+        state.reticle.targetY = e.clientY;
+      }
+    });
+
+    window.addEventListener('mousedown', (e) => {
+      if (!state.handDetected && state.isPlaying) {
+        state.reticle.targetX = e.clientX;
+        state.reticle.targetY = e.clientY;
+        triggerShot(e.clientX, e.clientY);
+      }
+    });
+
+    window.addEventListener('touchmove', (e) => {
+      if (!state.handDetected && e.touches.length > 0) {
+        state.reticle.targetX = e.touches[0].clientX;
+        state.reticle.targetY = e.touches[0].clientY;
+      }
+    });
+
+    window.addEventListener('touchstart', (e) => {
+      if (!state.handDetected && state.isPlaying && e.touches.length > 0) {
+        const touch = e.touches[0];
+        state.reticle.targetX = touch.clientX;
+        state.reticle.targetY = touch.clientY;
+        triggerShot(touch.clientX, touch.clientY);
+      }
+    });
+
+    // Start Button: Initialize Camera & Hands
+    document.getElementById('btn-start-game').addEventListener('click', async () => {
+      const loadingEl = document.getElementById('camera-loading');
+      loadingEl.classList.remove('hidden');
+
+      try {
+        // Initialize Web Audio
+        await Tone.start();
+        AudioEngine.init();
+
+        // Setup MediaPipe Hands
+        setupMediaPipe();
+
+        // Setup Camera Utils
+        cameraInstance = new Camera(videoElement, {
+          onFrame: async () => {
+            if (handsDetector) {
+              await handsDetector.send({ image: videoElement });
+            }
+          },
+          width: 1280,
+          height: 720
+        });
+
+        await cameraInstance.start();
+        loadingEl.classList.add('hidden');
+        startGame();
+      } catch (err) {
+        console.warn("Camera failed or denied. Starting in mouse/touch mode:", err);
+        loadingEl.classList.add('hidden');
+        showToast("⚠️ Kamera tidak dapat diakses. Mengaktifkan mod tetikus/sentuhan skrin!");
+        startGame();
+      }
+    });
+
+    window.addEventListener('load', () => {
+      requestAnimationFrame(gameLoop);
+    });
+  </script>
+</body>
+</html>
